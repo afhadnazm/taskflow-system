@@ -20,15 +20,15 @@ new #[Layout('layouts.guest')] class extends Component {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-            'manager_id' => ['required', 'exists:users,id'],
+            'manager_id' => [User::count() > 0 ? 'required' : 'nullable', 'exists:users,id'],
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'manager_id' => $validated['manager_id'],
-            'role' => 'employee',
+            'manager_id' => $validated['manager_id'] ?? null,
+            'role' => User::count() === 0 ? 'manager' : 'employee',
             'password' => Hash::make($validated['password']),
         ]);
 
@@ -57,15 +57,11 @@ new #[Layout('layouts.guest')] class extends Component {
         <div class="mt-4">
             <x-input-label for="manager_id" value="Manager" />
 
-            <select
-                wire:model="manager_id"
-                id="manager_id"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                required
-            >
+            <select wire:model="manager_id" id="manager_id"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" >
                 <option value="">Select your manager</option>
 
-                @foreach (\App\Models\User::where('role', 'manager')->get() as $manager)
+                @foreach (User::where('role', 'manager')->get() as $manager)
                     <option value="{{ $manager->id }}">
                         {{ $manager->name }}
                     </option>
@@ -83,7 +79,8 @@ new #[Layout('layouts.guest')] class extends Component {
 
         <div class="mt-4">
             <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
-            <x-text-input wire:model="password_confirmation" id="password_confirmation" class="block mt-1 w-full" type="password" required />
+            <x-text-input wire:model="password_confirmation" id="password_confirmation" class="block mt-1 w-full"
+                type="password" required />
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>
 
