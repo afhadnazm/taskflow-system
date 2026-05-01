@@ -27,7 +27,7 @@ new #[Layout('layouts.guest')] class extends Component {
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'manager_id' => $validated['manager_id'] ?? null,
+            'manager_id' => !empty($validated['manager_id']) ? $validated['manager_id'] : null,
             'role' => User::count() === 0 ? 'manager' : 'employee',
             'password' => Hash::make($validated['password']),
         ]);
