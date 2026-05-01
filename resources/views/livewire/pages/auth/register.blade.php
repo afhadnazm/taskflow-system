@@ -20,7 +20,7 @@ new #[Layout('layouts.guest')] class extends Component {
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-            'manager_id' => [User::count() > 0 ? 'required' : 'nullable', 'exists:users,id'],
+            'manager_id' => [User::where('role', 'manager')->exists() ? 'required' : 'nullable', 'exists:users,id'],
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
         ]);
 
@@ -58,7 +58,7 @@ new #[Layout('layouts.guest')] class extends Component {
             <x-input-label for="manager_id" value="Manager" />
 
             <select wire:model="manager_id" id="manager_id"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" >
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                 <option value="">Select your manager</option>
 
                 @foreach (User::where('role', 'manager')->get() as $manager)
