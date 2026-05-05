@@ -36,6 +36,7 @@ class Task extends Model
     {
         return $this->hasMany(TaskComment::class);
     }
+
     public function claimedByUser()
     {
         return $this->belongsTo(User::class, 'claimed_by');

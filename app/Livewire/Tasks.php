@@ -75,6 +75,7 @@ class Tasks extends Component
                 'action' => 'create_task',
                 'description' => 'Created task: ' . $this->title,
             ]);
+
             if ($this->assigned_to) {
                 $task->assignedUser?->notify(new TaskAssignedNotification($task));
             }

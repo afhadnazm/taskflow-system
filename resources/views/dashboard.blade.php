@@ -12,7 +12,6 @@
         $dashboardTasks = $dashboardProjects->flatMap->tasks;
         $ongoingTasksCount = $dashboardTasks->where('status', '!=', 'done')->count();
         $totalProjectsCount = $dashboardProjects->count();
-        $totalDepartmentsCount = class_exists(\App\Models\Department::class) ? \App\Models\Department::count() : 0;
         $totalMembersCount = \App\Models\User::where('id', $projectOwnerId)
             ->orWhere('manager_id', $projectOwnerId)
             ->count();
@@ -50,13 +49,6 @@
                 'icon' => 'M3.75 9.75h16.5m-16.5 0A2.25 2.25 0 016 7.5h12a2.25 2.25 0 012.25 2.25m-16.5 0v6A2.25 2.25 0 006 18h12a2.25 2.25 0 002.25-2.25v-6',
             ],
             [
-                'title' => 'Total Departments',
-                'value' => $totalDepartmentsCount,
-                'border' => 'border-yellow-500/50',
-                'badge' => 'bg-yellow-500/15 text-yellow-300 ring-yellow-500/30',
-                'icon' => 'M3.75 21h16.5M4.5 3h15l-.75 18H5.25L4.5 3zm4.5 4.5h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15',
-            ],
-            [
                 'title' => 'Total Members',
                 'value' => $totalMembersCount,
                 'border' => 'border-orange-500/50',
@@ -75,7 +67,7 @@
     <div class="bg-[#0f1115] py-6">
         @if ($tab === 'dashboard')
             <div class="mx-auto max-w-7xl space-y-6">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($statCards as $card)
                         <div class="rounded-xl border {{ $card['border'] }} bg-[#17191f] p-5 shadow-lg shadow-black/20">
                             <div class="flex items-start justify-between gap-4">
@@ -275,27 +267,127 @@
         @endif
 
         @if ($tab === 'activity')
+            @php
+                $activityUser = auth()->user();
+
+                if ($activityUser->role === 'admin') {
+                    $activityLogs = \App\Models\ActivityLog::with('user')
+                        ->latest()
+                        ->take(20)
+                        ->get();
+                } elseif ($activityUser->role === 'manager') {
+                    $activityLogs = \App\Models\ActivityLog::with('user')
+                        ->whereHas('user', function ($query) use ($activityUser) {
+                            $query->where('manager_id', $activityUser->id)
+                                ->orWhere('id', $activityUser->id);
+                        })
+                        ->latest()
+                        ->take(20)
+                        ->get();
+                } else {
+                    $activityLogs = \App\Models\ActivityLog::with('user')
+                        ->where(function ($query) use ($activityUser) {
+                            $query->where('user_id', $activityUser->id)
+                                ->orWhere('user_id', $activityUser->manager_id);
+                        })
+                        ->latest()
+                        ->take(20)
+                        ->get();
+                }
+            @endphp
+
             <div wire:poll.visible.5s class="mx-auto mt-6 max-w-5xl p-6">
-                <div class="rounded-xl border border-gray-800 bg-[#17191f] p-5 shadow-lg">
-                    <h3 class="mb-4 text-lg font-bold text-white">
-                        Recent Activity
-                    </h3>
-
-                    <div class="space-y-3">
-                        @forelse (\App\Models\ActivityLog::with('user')->latest()->take(10)->get() as $log)
-                            <div class="border-b border-gray-800 pb-3 text-sm text-gray-300">
-                                <strong>{{ $log->user->name }}</strong>
-                                — {{ $log->description }}
-
-                                <div class="mt-1 text-xs text-gray-500">
-                                    {{ $log->created_at->diffForHumans() }}
-                                </div>
+                <div class="overflow-hidden rounded-xl border border-gray-800 bg-[#17191f] shadow-lg shadow-black/10">
+                    <div class="border-b border-gray-800 px-6 py-5">
+                        <div class="flex flex-col items-center gap-3 text-center">
+                            <div>
+                                <h3 class="text-lg font-bold text-white">
+                                    Activity Timeline
+                                </h3>
+                                <p class="mt-1 text-sm text-gray-500">
+                                    Latest updates across tasks and projects.
+                                </p>
                             </div>
-                        @empty
-                            <p class="text-sm text-gray-500">
-                                No activity yet.
-                            </p>
-                        @endforelse
+
+                            <span class="inline-flex w-fit items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
+                                Live updates
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <div class="space-y-4">
+                            @forelse ($activityLogs as $log)
+                                @php
+                                    $actionStyles = [
+                                        'create_task' => 'border-blue-500/30 bg-blue-500/10 text-blue-300',
+                                        'update_status' => 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+                                        'take_task' => 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+                                        'unfollow_task' => 'border-red-500/30 bg-red-500/10 text-red-300',
+                                    ];
+
+                                    $actionLabels = [
+                                        'create_task' => 'Created',
+                                        'update_status' => 'Updated',
+                                        'take_task' => 'Claimed',
+                                        'unfollow_task' => 'Unfollowed',
+                                    ];
+
+                                    $badgeClass = $actionStyles[$log->action] ?? 'border-gray-700 bg-[#0b0d12] text-gray-300';
+                                    $actionLabel = $actionLabels[$log->action] ?? str($log->action)->replace('_', ' ')->title();
+                                    $initials = str($log->user?->name ?? 'User')
+                                        ->explode(' ')
+                                        ->map(fn ($part) => str($part)->substr(0, 1))
+                                        ->take(2)
+                                        ->implode('');
+                                @endphp
+
+                                <div class="relative rounded-xl border border-gray-800 bg-[#0b0d12] p-4 transition hover:border-blue-500/60">
+                                    <div class="flex gap-4">
+                                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cyan-500/30 bg-cyan-500/10 text-sm font-bold text-cyan-300">
+                                            {{ $initials }}
+                                        </div>
+
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                                <div>
+                                                    <p class="text-sm font-semibold text-white">
+                                                        {{ $log->user?->name ?? 'Unknown user' }}
+                                                    </p>
+                                                    <p class="mt-1 text-sm leading-6 text-gray-300">
+                                                        {{ $log->description }}
+                                                    </p>
+                                                </div>
+
+                                                <span class="inline-flex w-fit shrink-0 rounded-full border px-3 py-1 text-xs font-semibold {{ $badgeClass }}">
+                                                    {{ $actionLabel }}
+                                                </span>
+                                            </div>
+
+                                            <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                                                <span>{{ $log->created_at->diffForHumans() }}</span>
+                                                <span class="h-1 w-1 rounded-full bg-gray-700"></span>
+                                                <span>{{ $log->created_at->format('d M Y, H:i') }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-gray-800 bg-[#0b0d12] px-6 text-center">
+                                    <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-gray-700 bg-[#17191f] text-cyan-300">
+                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <p class="font-semibold text-white">
+                                        No activity yet
+                                    </p>
+                                    <p class="mt-2 text-sm text-gray-500">
+                                        Task updates and project actions will appear here.
+                                    </p>
+                                </div>
+                            @endforelse
+                        </div>
                     </div>
                 </div>
             </div>

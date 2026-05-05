@@ -22,10 +22,25 @@
         $tab = request('tab', 'dashboard');
 
         $navItems = [
-            ['label' => 'Dashboard', 'href' => route('dashboard') . '?tab=dashboard', 'active' => $tab === 'dashboard' && ! request()->routeIs('projects.*')],
-            ['label' => 'Projects', 'href' => route('dashboard') . '?tab=projects', 'active' => $tab === 'projects' || request()->routeIs('projects.*')],
+            [
+                'label' => 'Dashboard',
+                'href' => route('dashboard') . '?tab=dashboard',
+                'active' => $tab === 'dashboard' && !request()->routeIs('projects.*') && !request()->routeIs('admin.*'),
+            ],
+            [
+                'label' => 'Projects',
+                'href' => route('dashboard') . '?tab=projects',
+                'active' => $tab === 'projects' || request()->routeIs('projects.*'),
+            ],
             ['label' => 'Meetings', 'href' => route('dashboard') . '?tab=meetings', 'active' => $tab === 'meetings'],
             ['label' => 'Activity', 'href' => route('dashboard') . '?tab=activity', 'active' => $tab === 'activity'],
+        ];
+
+        $adminNavItems = [
+            ['label' => 'Admin Dashboard', 'href' => route('admin.dashboard'), 'active' => request()->routeIs('admin.dashboard')],
+            ['label' => 'Manage Users', 'href' => route('admin.users'), 'active' => request()->routeIs('admin.users')],
+            ['label' => 'Manage Projects', 'href' => route('admin.projects'), 'active' => request()->routeIs('admin.projects')],
+            ['label' => 'Manage Tasks', 'href' => route('admin.tasks'), 'active' => request()->routeIs('admin.tasks')],
         ];
     @endphp
 
@@ -38,11 +53,8 @@
         <aside
             class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-gray-800 bg-[#0f1115]/95 px-5 py-6 shadow-2xl shadow-black/30 lg:flex lg:flex-col">
             <a href="{{ route('dashboard') }}?tab=dashboard" wire:navigate class="block">
-                <img
-                    src="{{ asset('images/shams-logo.jpg') }}"
-                    alt="TaskFlow"
-                    class="h-auto w-auto rounded-lg object-contain"
-                >
+                <img src="{{ asset('images/shams-logo.jpg') }}" alt="TaskFlow"
+                    class="h-auto w-auto rounded-lg object-contain">
             </a>
 
             <div class="mt-8 rounded-2xl border border-gray-800 bg-[#17191f] p-4">
@@ -53,19 +65,36 @@
             </div>
 
             <nav class="mt-8 flex-1 space-y-1">
-                @foreach ($navItems as $item)
-                    <a href="{{ $item['href'] }}" wire:navigate
-                        class="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition
-                        {{ $item['active'] ? 'bg-cyan-400 text-slate-950' : 'text-gray-300 hover:bg-[#17191f] hover:text-white' }}">
-                        <span>{{ $item['label'] }}</span>
+                @if ($user->role !== 'admin')
+                    @foreach ($navItems as $item)
+                        <a href="{{ $item['href'] }}" wire:navigate
+                            class="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition
+                            {{ $item['active'] ? 'bg-cyan-400 text-slate-950' : 'text-gray-300 hover:bg-[#17191f] hover:text-white' }}">
+                            <span>{{ $item['label'] }}</span>
 
-                        @if ($item['label'] === 'Notifications' && $notificationCount > 0)
-                            <span class="rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white">
-                                {{ $notificationCount }}
-                            </span>
-                        @endif
-                    </a>
-                @endforeach
+                            @if ($item['label'] === 'Notifications' && $notificationCount > 0)
+                                <span class="rounded-full bg-rose-500 px-2 py-0.5 text-xs font-bold text-white">
+                                    {{ $notificationCount }}
+                                </span>
+                            @endif
+                        </a>
+                    @endforeach
+                @endif
+
+                @if ($user->role === 'admin')
+                    <div class="space-y-1">
+                        <p class="mb-2 px-4 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Admin</p>
+                        <div class="space-y-1">
+                            @foreach ($adminNavItems as $item)
+                                <a href="{{ $item['href'] }}" wire:navigate
+                                    class="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition
+                                    {{ $item['active'] ? 'bg-cyan-400 text-slate-950' : 'text-gray-300 hover:bg-[#17191f] hover:text-white' }}">
+                                    {{ $item['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </nav>
 
             <div class="border-t border-gray-800 pt-5">
@@ -81,8 +110,8 @@
                 </button>
 
                 <p class="mt-5 px-4 text-xs leading-5 text-gray-500">
-                    Developed by <span class="font-semibold text-gray-300">afhad.barzani</span> and
-                    <span class="font-semibold text-gray-300">sari.barzani</span>
+                    Developed by <span class="font-semibold text-gray-300">Afhad Barzani</span> and
+                    <span class="font-semibold text-gray-300">Sari Barzani</span>
                 </p>
             </div>
         </aside>
@@ -96,11 +125,8 @@
             class="fixed left-0 top-0 z-50 h-screen w-72 border-r border-gray-800 bg-[#0f1115] p-5 lg:hidden">
             <div class="mb-8 flex items-center justify-between">
                 <a href="{{ route('dashboard') }}?tab=dashboard" wire:navigate class="block">
-                    <img
-                        src="{{ asset('images/shams-logo.jpg') }}"
-                        alt="TaskFlow"
-                        class="h-12 w-auto rounded-lg object-contain"
-                    >
+                    <img src="{{ asset('images/shams-logo.jpg') }}" alt="TaskFlow"
+                        class="h-24 w-auto rounded-lg object-contain">
                 </a>
 
                 <button @click="mobileMenuOpen = false" class="text-2xl text-white">
@@ -108,15 +134,39 @@
                 </button>
             </div>
 
-            <nav class="flex h-[calc(100vh-130px)] flex-col justify-between">
+            <div class="mb-6 rounded-2xl border border-gray-800 bg-[#17191f] p-4">
+                <div class="text-sm font-semibold text-white">{{ $user->name }}</div>
+                <div class="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
+                    {{ $user->role }}
+                </div>
+            </div>
+
+            <nav class="flex h-[calc(100vh-210px)] flex-col justify-between">
                 <div class="space-y-2">
-                    @foreach ($navItems as $item)
-                        <a href="{{ $item['href'] }}" wire:navigate
-                            class="block rounded-xl px-4 py-3 text-sm font-semibold
-                        {{ $item['active'] ? 'bg-cyan-400 text-slate-950' : 'text-gray-300 hover:bg-[#17191f] hover:text-white' }}">
-                            {{ $item['label'] }}
-                        </a>
-                    @endforeach
+                    @if ($user->role !== 'admin')
+                        @foreach ($navItems as $item)
+                            <a href="{{ $item['href'] }}" wire:navigate
+                                class="block rounded-xl px-4 py-3 text-sm font-semibold
+                            {{ $item['active'] ? 'bg-cyan-400 text-slate-950' : 'text-gray-300 hover:bg-[#17191f] hover:text-white' }}">
+                                {{ $item['label'] }}
+                            </a>
+                        @endforeach
+                    @endif
+
+                    @if ($user->role === 'admin')
+                        <div>
+                            <p class="mb-2 px-4 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Admin</p>
+                            <div class="space-y-2">
+                                @foreach ($adminNavItems as $item)
+                                    <a href="{{ $item['href'] }}" wire:navigate
+                                        class="block rounded-xl px-4 py-3 text-sm font-semibold
+                                        {{ $item['active'] ? 'bg-cyan-400 text-slate-950' : 'text-gray-300 hover:bg-[#17191f] hover:text-white' }}">
+                                        {{ $item['label'] }}
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="space-y-2 border-t border-gray-800 pt-4">
@@ -132,8 +182,8 @@
                     </button>
 
                     <p class="px-4 pt-3 text-xs leading-5 text-gray-500">
-                        Developed by <span class="font-semibold text-gray-300">afhad.barzani</span> and
-                        <span class="font-semibold text-gray-300">sari.barzani</span>
+                        Developed by <span class="font-semibold text-gray-300">Afhad Barzani</span> and
+                        <span class="font-semibold text-gray-300">Sari Barzani</span>
                     </p>
                 </div>
             </nav>
@@ -164,13 +214,8 @@
                             </span>
                         </button>
 
-                        <div
-                            x-show="notificationOpen"
-                            x-cloak
-                            @click.outside="notificationOpen = false"
-                            x-transition
-                            class="absolute right-0 z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-gray-800 bg-[#17191f] shadow-2xl shadow-black/40"
-                        >
+                        <div x-show="notificationOpen" x-cloak @click.outside="notificationOpen = false" x-transition
+                            class="absolute right-0 z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-gray-800 bg-[#17191f] shadow-2xl shadow-black/40">
                             <div class="border-b border-gray-800 px-4 py-3">
                                 <h3 class="text-sm font-semibold text-white">Notifications</h3>
                                 <p class="mt-1 text-xs text-gray-500">{{ $notificationCount }} unread</p>
@@ -178,14 +223,13 @@
 
                             <div class="max-h-96 overflow-y-auto p-2">
                                 @forelse (auth()->user()->unreadNotifications as $notification)
-                                    <a
-                                        href="{{ route('notifications.read', $notification->id) }}"
-                                        class="block rounded-xl border border-transparent p-3 text-sm text-gray-300 transition hover:border-cyan-500/40 hover:bg-[#0b0d12] hover:text-white"
-                                    >
+                                    <a href="{{ route('notifications.read', $notification->id) }}"
+                                        class="block rounded-xl border border-transparent p-3 text-sm text-gray-300 transition hover:border-cyan-500/40 hover:bg-[#0b0d12] hover:text-white">
                                         {{ $notification->data['message'] }}
                                     </a>
                                 @empty
-                                    <div class="flex min-h-28 items-center justify-center rounded-xl bg-[#0b0d12] px-4 text-center text-sm text-gray-500">
+                                    <div
+                                        class="flex min-h-28 items-center justify-center rounded-xl bg-[#0b0d12] px-4 text-center text-sm text-gray-500">
                                         No new notifications.
                                     </div>
                                 @endforelse
