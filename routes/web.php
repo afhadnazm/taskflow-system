@@ -21,6 +21,15 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/projects/{project}/tasks', Tasks::class)
         ->name('projects.tasks');
+    Route::get('/notifications/{notification}/read', function ($notificationId) {
+        $notification = auth()->user()
+            ->notifications()
+            ->findOrFail($notificationId);
+
+        $notification->markAsRead();
+
+        return redirect()->route('projects.tasks', $notification->data['project_id']);
+    })->name('notifications.read');
 });
 
 require __DIR__ . '/auth.php';

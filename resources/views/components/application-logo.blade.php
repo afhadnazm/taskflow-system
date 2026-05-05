@@ -1,3 +1,6 @@
-<h2 class="text-center text-xl font-bold mb-4">
-    TaskFlow System
-</h2>
+<div class="mb-4 flex justify-center mt-4">
+
+    <a href="/">
+        <img src="{{ asset('images/shams-logo.jpg') }}" alt="Logo" class="h-16">
+    </a>
+</div>

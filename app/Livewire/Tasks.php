@@ -6,6 +6,8 @@ use App\Models\Project;
 use App\Models\Task;
 use Livewire\Component;
 use App\Models\TaskComment;
+use App\Models\ActivityLog;
+use App\Notifications\TaskAssignedNotification;
 class Tasks extends Component
 {
     public Project $project;
@@ -41,6 +43,8 @@ class Tasks extends Component
             $task = Task::where('project_id', $this->project->id)
                 ->findOrFail($this->editingTaskId);
 
+            $previousAssignee = $task->assigned_to;
+
             $task->update([
                 'title' => $this->title,
                 'description' => $this->description,
@@ -49,10 +53,14 @@ class Tasks extends Component
                 'assigned_to' => $this->assigned_to ?: null,
             ]);
 
+            if ($this->assigned_to && (int) $previousAssignee !== (int) $this->assigned_to) {
+                $task->assignedUser?->notify(new TaskAssignedNotification($task));
+            }
+
             $this->editingTaskId = null;
             $this->buttonText = 'Add Task';
         } else {
-            Task::create([
+            $task = Task::create([
                 'project_id' => $this->project->id,
                 'user_id' => auth()->id(),
                 'assigned_to' => $this->assigned_to ?: null,
@@ -62,7 +70,16 @@ class Tasks extends Component
                 'priority' => $this->priority,
                 'due_date' => $this->due_date ?: null,
             ]);
+            ActivityLog::create([
+                'user_id' => auth()->id(),
+                'action' => 'create_task',
+                'description' => 'Created task: ' . $this->title,
+            ]);
+            if ($this->assigned_to) {
+                $task->assignedUser?->notify(new TaskAssignedNotification($task));
+            }
         }
+     
 
         $this->reset(['title', 'description', 'priority', 'due_date', 'assigned_to']);
         $this->priority = 'medium';
@@ -121,6 +138,11 @@ class Tasks extends Component
         $task->update([
             'status' => $status,
         ]);
+        ActivityLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'update_status',
+            'description' => 'Changed task "' . $task->title . '" to ' . str_replace('_', ' ', $status),
+        ]);
     }
     public function edit($taskId)
     {
@@ -175,6 +197,31 @@ class Tasks extends Component
             'assigned_to' => auth()->id(),
             'claimed_by' => auth()->id(),
             'status' => 'in_progress',
+        ]);
+        ActivityLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'take_task',
+            'description' => 'Took task: ' . $task->title,
+        ]);
+    }
+    public function unfollowTask($taskId)
+    {
+        $task = Task::where('project_id', $this->project->id)
+            ->findOrFail($taskId);
+
+        if ($task->claimed_by !== auth()->id()) {
+            abort(403);
+        }
+
+        $task->update([
+            'assigned_to' => null,
+            'claimed_by' => null,
+            'status' => 'todo',
+        ]);
+        ActivityLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'unfollow_task',
+            'description' => 'Unfollowed task: ' . $task->title,
         ]);
     }
    
