@@ -12,9 +12,11 @@
         $dashboardTasks = $dashboardProjects->flatMap->tasks;
         $ongoingTasksCount = $dashboardTasks->where('status', '!=', 'done')->count();
         $totalProjectsCount = $dashboardProjects->count();
-        $totalMembersCount = \App\Models\User::where('id', $projectOwnerId)
-            ->orWhere('manager_id', $projectOwnerId)
-            ->count();
+        $totalMembersCount = $currentUser->role === 'manager'
+            ? \App\Models\User::where('manager_id', $currentUser->id)->count()
+            : \App\Models\User::where('id', $projectOwnerId)
+                ->orWhere('manager_id', $projectOwnerId)
+                ->count();
 
         $assigneeStats = $dashboardTasks
             ->groupBy(fn ($task) => optional($task->assignedUser)->name ?: 'Unassigned')
@@ -42,14 +44,14 @@
                 'icon' => 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
             ],
             [
-                'title' => 'Total Projects',
+                'title' => $currentUser->role === 'manager' ? 'My Projects' : 'Total Projects',
                 'value' => $totalProjectsCount,
                 'border' => 'border-green-500/50',
                 'badge' => 'bg-green-500/15 text-green-300 ring-green-500/30',
                 'icon' => 'M3.75 9.75h16.5m-16.5 0A2.25 2.25 0 016 7.5h12a2.25 2.25 0 012.25 2.25m-16.5 0v6A2.25 2.25 0 006 18h12a2.25 2.25 0 002.25-2.25v-6',
             ],
             [
-                'title' => 'Total Members',
+                'title' => $currentUser->role === 'manager' ? 'My Employees' : 'Total Members',
                 'value' => $totalMembersCount,
                 'border' => 'border-orange-500/50',
                 'badge' => 'bg-orange-500/15 text-orange-300 ring-orange-500/30',
@@ -66,6 +68,113 @@
 
     <div class="bg-[#0f1115] py-6">
         @if ($tab === 'dashboard')
+            @if ($currentUser->role === 'employee')
+                @php
+                    $employeeTaskQuery = \App\Models\Task::with('project')
+                        ->where(function ($query) use ($currentUser) {
+                            $query->where('assigned_to', $currentUser->id)
+                                ->orWhere('claimed_by', $currentUser->id);
+                        });
+
+                    $employeeTodoTasks = (clone $employeeTaskQuery)->where('status', 'todo')->count();
+                    $employeeProgressTasks = (clone $employeeTaskQuery)->where('status', 'in_progress')->count();
+                    $employeeDoneTasks = (clone $employeeTaskQuery)->where('status', 'done')->count();
+
+                    $employeeActiveTasks = (clone $employeeTaskQuery)
+                        ->where('status', '!=', 'done')
+                        ->latest()
+                        ->get();
+
+                    $employeeProjects = \App\Models\Project::where('user_id', $currentUser->manager_id)
+                        ->latest()
+                        ->get();
+
+                    $employeeMeetings = class_exists(\App\Models\Meeting::class)
+                        ? \App\Models\Meeting::where('user_id', $currentUser->manager_id)->latest()->take(5)->get()
+                        : collect();
+
+                    $employeeStats = [
+                        ['label' => 'My To Do Tasks', 'value' => $employeeTodoTasks, 'border' => 'border-blue-500/50', 'text' => 'text-blue-300'],
+                        ['label' => 'My In Progress Tasks', 'value' => $employeeProgressTasks, 'border' => 'border-amber-500/50', 'text' => 'text-amber-300'],
+                        ['label' => 'My Completed Tasks', 'value' => $employeeDoneTasks, 'border' => 'border-emerald-500/50', 'text' => 'text-emerald-300'],
+                    ];
+                @endphp
+
+                <div class="mx-auto max-w-7xl space-y-6">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        @foreach ($employeeStats as $stat)
+                            <div class="rounded-xl border {{ $stat['border'] }} bg-[#17191f] p-5 shadow-lg shadow-black/10">
+                                <p class="text-sm font-medium text-gray-400">{{ $stat['label'] }}</p>
+                                <p class="mt-3 text-3xl font-bold text-white">{{ $stat['value'] }}</p>
+                                <div class="mt-4 h-1 rounded-full bg-gray-800">
+                                    <div class="h-1 w-1/2 rounded-full bg-cyan-400"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                        <div class="space-y-6">
+                            <div class="rounded-xl border border-gray-800 bg-[#17191f] p-5 shadow-lg shadow-black/10">
+                                <h2 class="mb-4 text-lg font-bold text-white">Notifications</h2>
+
+                                <div class="space-y-2">
+                                    @forelse ($currentUser->unreadNotifications as $notification)
+                                        <a href="{{ route('notifications.read', $notification->id) }}" class="block rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-200 transition hover:border-blue-500">
+                                            {{ $notification->data['message'] }}
+                                        </a>
+                                    @empty
+                                        <p class="rounded-lg border border-gray-800 bg-[#0b0d12] p-4 text-sm text-gray-500">No new notifications.</p>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            @if (class_exists(\App\Models\Meeting::class))
+                                <div class="rounded-xl border border-gray-800 bg-[#17191f] p-5 shadow-lg shadow-black/10">
+                                    <h2 class="mb-4 text-lg font-bold text-white">Upcoming Meetings</h2>
+
+                                    <div class="space-y-3">
+                                        @forelse ($employeeMeetings as $meeting)
+                                            <div class="rounded-lg border border-gray-800 bg-[#0b0d12] p-3">
+                                                <p class="font-semibold text-white">{{ $meeting->title }}</p>
+                                                <p class="mt-1 text-sm text-gray-500">{{ $meeting->description ?: 'No description' }}</p>
+                                                <p class="mt-2 text-xs font-semibold text-cyan-300">
+                                                    {{ \Carbon\Carbon::parse($meeting->meeting_time)->format('d M Y - H:i') }}
+                                                </p>
+                                            </div>
+                                        @empty
+                                            <p class="rounded-lg border border-gray-800 bg-[#0b0d12] p-4 text-sm text-gray-500">No upcoming meetings.</p>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-gray-800 bg-[#17191f] p-5 shadow-lg shadow-black/10">
+                        <div class="mb-5 flex items-center justify-between gap-4">
+                            <h2 class="text-lg font-bold text-white">My Projects</h2>
+                            <span class="text-sm text-gray-500">{{ $employeeProjects->count() }} projects</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            @forelse ($employeeProjects as $project)
+                                <div class="rounded-xl border border-gray-800 bg-[#0b0d12] p-4 transition hover:border-blue-500">
+                                    <h3 class="font-semibold text-white">{{ $project->name }}</h3>
+                                    <p class="mt-2 text-sm leading-6 text-gray-400">{{ $project->description ?: 'No description' }}</p>
+                                    <a href="{{ route('projects.tasks', $project) }}" class="mt-4 inline-flex rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-3 py-2 text-sm font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
+                                        View Tasks
+                                    </a>
+                                </div>
+                            @empty
+                                <div class="rounded-xl border border-gray-800 bg-[#0b0d12] p-6 text-center text-sm text-gray-500 md:col-span-2 xl:col-span-3">
+                                    No projects available yet.
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            @else
             <div class="mx-auto max-w-7xl space-y-6">
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($statCards as $card)
@@ -192,6 +301,7 @@
                     @endif
                 </div>
             </div>
+            @endif
         @endif
 
         @if ($tab === 'projects')
@@ -243,6 +353,111 @@
             <livewire:meetings />
         @endif
 
+        @if ($tab === 'reports')
+            @php
+                abort_if(! in_array(auth()->user()->role, ['manager', 'admin'], true), 403);
+
+                $reportEmployees = \App\Models\User::where('role', 'employee')
+                    ->when(auth()->user()->role === 'manager', function ($query) {
+                        $query->where('manager_id', auth()->id());
+                    })
+                    ->with(['manager'])
+                    ->orderBy('name')
+                    ->get();
+
+                $reportTasks = \App\Models\Task::whereIn('assigned_to', $reportEmployees->pluck('id'))
+                    ->get()
+                    ->groupBy('assigned_to');
+
+                $employeeReports = $reportEmployees->map(function ($employee) use ($reportTasks) {
+                    $tasks = $reportTasks->get($employee->id, collect());
+                    $total = $tasks->count();
+                    $done = $tasks->where('status', 'done')->count();
+                    $progress = $tasks->where('status', 'in_progress')->count();
+                    $todo = $tasks->where('status', 'todo')->count();
+
+                    return [
+                        'employee' => $employee,
+                        'total' => $total,
+                        'done' => $done,
+                        'progress' => $progress,
+                        'todo' => $todo,
+                        'percentage' => $total > 0 ? round(($done / $total) * 100) : 0,
+                    ];
+                });
+            @endphp
+
+            <div class="mx-auto max-w-7xl space-y-6 p-6">
+                <div class="rounded-xl border border-gray-800 bg-[#17191f] p-6 shadow-lg shadow-black/10">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-cyan-300">Reports</p>
+                            <h1 class="mt-2 text-2xl font-bold text-white">Team Performance Report</h1>
+                            <p class="mt-2 text-sm text-gray-500">
+                                Task completion summary by employee.
+                            </p>
+                        </div>
+
+                        <a href="{{ route('reports.export') }}" class="inline-flex w-fit rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 text-sm font-semibold text-white transition hover:from-blue-400 hover:to-cyan-400">
+                            Export CSV
+                        </a>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    @forelse ($employeeReports as $report)
+                        <div class="rounded-xl border border-gray-800 bg-[#17191f] p-5 shadow-lg shadow-black/10">
+                            <div class="mb-5 flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 class="text-lg font-bold text-white">{{ $report['employee']->name }}</h2>
+                                    <p class="mt-1 text-sm text-gray-500">
+                                        Manager: {{ $report['employee']->manager?->name ?? 'Not assigned' }}
+                                    </p>
+                                </div>
+
+                                <span class="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">
+                                    {{ $report['percentage'] }}%
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="rounded-xl border border-gray-800 bg-[#0b0d12] p-4">
+                                    <p class="text-xs font-medium text-gray-500">Total Tasks</p>
+                                    <p class="mt-2 text-2xl font-bold text-white">{{ $report['total'] }}</p>
+                                </div>
+                                <div class="rounded-xl border border-emerald-500/30 bg-[#0b0d12] p-4">
+                                    <p class="text-xs font-medium text-gray-500">Completed</p>
+                                    <p class="mt-2 text-2xl font-bold text-emerald-300">{{ $report['done'] }}</p>
+                                </div>
+                                <div class="rounded-xl border border-amber-500/30 bg-[#0b0d12] p-4">
+                                    <p class="text-xs font-medium text-gray-500">In Progress</p>
+                                    <p class="mt-2 text-2xl font-bold text-amber-300">{{ $report['progress'] }}</p>
+                                </div>
+                                <div class="rounded-xl border border-blue-500/30 bg-[#0b0d12] p-4">
+                                    <p class="text-xs font-medium text-gray-500">To Do</p>
+                                    <p class="mt-2 text-2xl font-bold text-blue-300">{{ $report['todo'] }}</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-5">
+                                <div class="mb-2 flex items-center justify-between text-xs text-gray-500">
+                                    <span>Completion</span>
+                                    <span>{{ $report['done'] }} / {{ $report['total'] }}</span>
+                                </div>
+                                <div class="h-2 overflow-hidden rounded-full bg-gray-800">
+                                    <div class="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" style="width: {{ $report['percentage'] }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="rounded-xl border border-gray-800 bg-[#17191f] p-8 text-center text-gray-500 lg:col-span-2">
+                            No employees found for this report.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+        @endif
+
         @if ($tab === 'notifications')
             <div wire:poll.visible.5s class="mx-auto mt-6 max-w-5xl p-6">
                 <div class="rounded-xl border border-gray-800 bg-[#17191f] p-5 shadow-lg">
@@ -266,7 +481,7 @@
             </div>
         @endif
 
-        @if ($tab === 'activity')
+        @if ($tab === 'activity' && auth()->user()->role !== 'employee')
             @php
                 $activityUser = auth()->user();
 

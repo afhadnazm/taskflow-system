@@ -20,6 +20,7 @@
         $user = auth()->user();
         $notificationCount = $user ? $user->unreadNotifications()->count() : 0;
         $tab = request('tab', 'dashboard');
+        $homeHref = $user->role === 'admin' ? route('admin.dashboard') : route('dashboard') . '?tab=dashboard';
 
         $navItems = [
             [
@@ -33,14 +34,20 @@
                 'active' => $tab === 'projects' || request()->routeIs('projects.*'),
             ],
             ['label' => 'Meetings', 'href' => route('dashboard') . '?tab=meetings', 'active' => $tab === 'meetings'],
-            ['label' => 'Activity', 'href' => route('dashboard') . '?tab=activity', 'active' => $tab === 'activity'],
         ];
+
+        if ($user->role !== 'employee') {
+            $navItems[] = ['label' => 'Reports', 'href' => route('dashboard') . '?tab=reports', 'active' => $tab === 'reports'];
+            $navItems[] = ['label' => 'Activity', 'href' => route('dashboard') . '?tab=activity', 'active' => $tab === 'activity'];
+        }
 
         $adminNavItems = [
             ['label' => 'Admin Dashboard', 'href' => route('admin.dashboard'), 'active' => request()->routeIs('admin.dashboard')],
             ['label' => 'Manage Users', 'href' => route('admin.users'), 'active' => request()->routeIs('admin.users')],
             ['label' => 'Manage Projects', 'href' => route('admin.projects'), 'active' => request()->routeIs('admin.projects')],
             ['label' => 'Manage Tasks', 'href' => route('admin.tasks'), 'active' => request()->routeIs('admin.tasks')],
+            ['label' => 'Reports', 'href' => route('dashboard') . '?tab=reports', 'active' => $tab === 'reports'],
+            ['label' => 'Audit Logs', 'href' => route('admin.audit-logs'), 'active' => request()->routeIs('admin.audit-logs')],
         ];
     @endphp
 
@@ -52,7 +59,7 @@
         <!-- Desktop Sidebar -->
         <aside
             class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-gray-800 bg-[#0f1115]/95 px-5 py-6 shadow-2xl shadow-black/30 lg:flex lg:flex-col">
-            <a href="{{ route('dashboard') }}?tab=dashboard" wire:navigate class="block">
+            <a href="{{ $homeHref }}" wire:navigate class="block">
                 <img src="{{ asset('images/shams-logo.jpg') }}" alt="TaskFlow"
                     class="h-auto w-auto rounded-lg object-contain">
             </a>
@@ -124,7 +131,7 @@
         <aside x-show="mobileMenuOpen" x-cloak x-transition
             class="fixed left-0 top-0 z-50 h-screen w-72 border-r border-gray-800 bg-[#0f1115] p-5 lg:hidden">
             <div class="mb-8 flex items-center justify-between">
-                <a href="{{ route('dashboard') }}?tab=dashboard" wire:navigate class="block">
+                <a href="{{ $homeHref }}" wire:navigate class="block">
                     <img src="{{ asset('images/shams-logo.jpg') }}" alt="TaskFlow"
                         class="h-24 w-auto rounded-lg object-contain">
                 </a>
@@ -200,12 +207,12 @@
                     </button>
 
 
-                    <div class="relative ml-auto max-w-xl flex-1">
+                    {{-- <div class="relative ml-auto max-w-xl flex-1">
                         <input type="search" placeholder="Search..."
                             class="w-full rounded-2xl border border-gray-800 bg-[#111318] px-4 py-3 text-sm text-gray-200 placeholder:text-slate-500 focus:border-cyan-300/70 focus:ring-2 focus:ring-cyan-400/20">
-                    </div>
+                    </div> --}}
 
-                    <div class="relative">
+                    <div class="relative ml-auto flex items-center gap-4">
                         <button type="button" @click="notificationOpen = ! notificationOpen"
                             class="rounded-2xl border border-gray-800 bg-[#17191f] px-4 py-3 text-sm font-semibold text-gray-200 transition hover:border-cyan-400 hover:text-white">
                             Notifications
@@ -215,7 +222,8 @@
                         </button>
 
                         <div x-show="notificationOpen" x-cloak @click.outside="notificationOpen = false" x-transition
-                            class="absolute right-0 z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-gray-800 bg-[#17191f] shadow-2xl shadow-black/40">
+                            style="position: fixed; top: 76px; right: 16px; width: min(20rem, calc(100vw - 2rem)); z-index: 9999;"
+                            class="overflow-hidden rounded-2xl border border-gray-800 bg-[#17191f] shadow-2xl shadow-black/40">
                             <div class="border-b border-gray-800 px-4 py-3">
                                 <h3 class="text-sm font-semibold text-white">Notifications</h3>
                                 <p class="mt-1 text-xs text-gray-500">{{ $notificationCount }} unread</p>
@@ -223,10 +231,17 @@
 
                             <div class="max-h-96 overflow-y-auto p-2">
                                 @forelse (auth()->user()->unreadNotifications as $notification)
-                                    <a href="{{ route('notifications.read', $notification->id) }}"
-                                        class="block rounded-xl border border-transparent p-3 text-sm text-gray-300 transition hover:border-cyan-500/40 hover:bg-[#0b0d12] hover:text-white">
-                                        {{ $notification->data['message'] }}
-                                    </a>
+                                    <div class="rounded-xl border border-transparent p-3 transition hover:border-cyan-500/40 hover:bg-[#0b0d12]">
+                                        <a href="{{ route('notifications.read', $notification->id) }}"
+                                            class="block text-sm text-gray-300 hover:text-white">
+                                            {{ $notification->data['message'] }}
+                                        </a>
+
+                                        <a href="{{ route('notifications.mark-as-read', $notification->id) }}"
+                                            class="mt-2 inline-flex text-xs font-semibold text-cyan-300 hover:text-cyan-200">
+                                            Mark as read
+                                        </a>
+                                    </div>
                                 @empty
                                     <div
                                         class="flex min-h-28 items-center justify-center rounded-xl bg-[#0b0d12] px-4 text-center text-sm text-gray-500">

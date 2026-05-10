@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ReportExportController;
 use App\Livewire\Admin\AdminDashboard;
+use App\Livewire\Admin\AuditLogs;
 use App\Livewire\Admin\ProjectManagement;
 use App\Livewire\Admin\TaskManagement;
 use App\Livewire\Admin\UserManagement;
@@ -25,6 +27,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/users', UserManagement::class)->name('admin.users');
     Route::get('/admin/projects', ProjectManagement::class)->name('admin.projects');
     Route::get('/admin/tasks', TaskManagement::class)->name('admin.tasks');
+    Route::get('/admin/audit-logs', AuditLogs::class)->name('admin.audit-logs');
+    Route::get('/reports/export', [ReportExportController::class, 'export'])->name('reports.export');
 
     Route::resource('projects', ProjectController::class);
 
@@ -39,6 +43,16 @@ Route::middleware(['auth'])->group(function () {
 
         return redirect()->route('projects.tasks', $notification->data['project_id']);
     })->name('notifications.read');
+
+    Route::get('/notifications/{notification}/mark-as-read', function ($notificationId) {
+        $notification = auth()->user()
+            ->notifications()
+            ->findOrFail($notificationId);
+
+        $notification->markAsRead();
+
+        return back();
+    })->name('notifications.mark-as-read');
 });
 
 require __DIR__ . '/auth.php';

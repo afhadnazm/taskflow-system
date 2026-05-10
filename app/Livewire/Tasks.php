@@ -7,6 +7,7 @@ use App\Models\Task;
 use Livewire\Component;
 use App\Models\TaskComment;
 use App\Models\ActivityLog;
+use App\Models\AuditLog;
 use App\Notifications\TaskAssignedNotification;
 class Tasks extends Component
 {
@@ -95,6 +96,13 @@ class Tasks extends Component
             abort(403);
         }
 
+        AuditLog::record(
+            'task_deleted',
+            'Deleted task ' . $task->title,
+            ['task_id' => $task->id, 'title' => $task->title, 'project_id' => $task->project_id],
+            []
+        );
+
         $task->delete();
     }
 
@@ -136,9 +144,21 @@ class Tasks extends Component
             abort(403);
         }
 
+        $oldStatus = $task->status;
+
         $task->update([
             'status' => $status,
         ]);
+
+        if ($status === 'done' && $oldStatus !== 'done') {
+            AuditLog::record(
+                'task_marked_done',
+                'Marked task "' . $task->title . '" as done',
+                ['status' => $oldStatus],
+                ['status' => $status]
+            );
+        }
+
         ActivityLog::create([
             'user_id' => auth()->id(),
             'action' => 'update_status',
@@ -214,11 +234,21 @@ class Tasks extends Component
             abort(403);
         }
 
+        $oldValues = $task->only(['assigned_to', 'claimed_by', 'status']);
+
         $task->update([
             'assigned_to' => null,
             'claimed_by' => null,
             'status' => 'todo',
         ]);
+
+        AuditLog::record(
+            'task_unfollowed',
+            'Unfollowed task ' . $task->title,
+            $oldValues,
+            ['assigned_to' => null, 'claimed_by' => null, 'status' => 'todo']
+        );
+
         ActivityLog::create([
             'user_id' => auth()->id(),
             'action' => 'unfollow_task',

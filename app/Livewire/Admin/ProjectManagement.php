@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\AuditLog;
 use App\Models\Project;
 use Livewire\Component;
 
@@ -16,7 +17,16 @@ class ProjectManagement extends Component
     {
         abort_unless(auth()->user()?->role === 'admin', 403);
 
-        Project::findOrFail($projectId)->delete();
+        $project = Project::with('user')->findOrFail($projectId);
+
+        AuditLog::record(
+            'project_deleted',
+            'Deleted project ' . $project->name,
+            ['project_id' => $project->id, 'name' => $project->name, 'owner_id' => $project->user_id],
+            []
+        );
+
+        $project->delete();
     }
 
     public function render()

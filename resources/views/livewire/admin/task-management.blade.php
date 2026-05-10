@@ -5,6 +5,15 @@
     </div>
 
     <div class="rounded-xl border border-gray-800 bg-[#17191f] p-5 shadow-lg shadow-black/10">
+        <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <h2 class="text-lg font-bold text-white">All Tasks</h2>
+            <input
+                wire:model.live.debounce.500ms="search"
+                type="search"
+                placeholder="Search tasks..."
+                class="w-full rounded-xl border border-gray-800 bg-[#0f1115] px-4 py-2 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500 md:max-w-sm"
+            >
+        </div>
         <div class="overflow-x-auto">
             <table class="min-w-full text-left text-sm">
                 <thead class="border-b border-gray-800 text-xs uppercase tracking-wider text-gray-500">

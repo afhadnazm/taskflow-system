@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use App\Models\AuditLog;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 class Projects extends Component
@@ -32,6 +33,13 @@ class Projects extends Component
         $project = Project::findOrFail($id);
 
         $this->authorize('delete', $project);
+
+        AuditLog::record(
+            'project_deleted',
+            'Deleted project ' . $project->name,
+            ['project_id' => $project->id, 'name' => $project->name, 'owner_id' => $project->user_id],
+            []
+        );
 
         $project->delete();
     }
