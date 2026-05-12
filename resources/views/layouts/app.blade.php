@@ -129,26 +129,27 @@
 
         <!-- Mobile Sidebar -->
         <aside x-show="mobileMenuOpen" x-cloak x-transition
-            class="fixed left-0 top-0 z-50 h-screen w-72 border-r border-gray-800 bg-[#0f1115] p-5 lg:hidden">
-            <div class="mb-8 flex items-center justify-between">
+            class="fixed left-0 top-0 z-50 flex h-screen max-h-screen w-72 flex-col overflow-y-auto border-r border-gray-800 bg-[#0f1115] p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] lg:hidden"
+            style="height: 100dvh; max-height: 100dvh;">
+            <div class="mb-8 flex shrink-0 items-center justify-between">
                 <a href="{{ $homeHref }}" wire:navigate class="block">
                     <img src="{{ asset('images/shams-logo.jpg') }}" alt="TaskFlow"
                         class="h-24 w-auto rounded-lg object-contain">
                 </a>
 
                 <button @click="mobileMenuOpen = false" class="text-2xl text-white">
-                    ×
+                    &times;
                 </button>
             </div>
 
-            <div class="mb-6 rounded-2xl border border-gray-800 bg-[#17191f] p-4">
+            <div class="mb-6 shrink-0 rounded-2xl border border-gray-800 bg-[#17191f] p-4">
                 <div class="text-sm font-semibold text-white">{{ $user->name }}</div>
                 <div class="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                     {{ $user->role }}
                 </div>
             </div>
 
-            <nav class="flex h-[calc(100vh-210px)] flex-col justify-between">
+            <nav class="flex min-h-0 flex-1 flex-col justify-between gap-8">
                 <div class="space-y-2">
                     @if ($user->role !== 'admin')
                         @foreach ($navItems as $item)
@@ -176,7 +177,7 @@
                     @endif
                 </div>
 
-                <div class="space-y-2 border-t border-gray-800 pt-4">
+                <div class="shrink-0 space-y-2 border-t border-gray-800 pt-4">
                     <a href="{{ route('profile') }}" wire:navigate
                         class="block rounded-xl px-4 py-3 text-sm font-semibold text-gray-300 hover:bg-[#17191f] hover:text-white">
                         Profile settings
@@ -194,7 +195,6 @@
                     </p>
                 </div>
             </nav>
-            </nav>
         </aside>
 
         <!-- Main Area -->
@@ -203,7 +203,7 @@
                 <div class="flex min-h-20 items-center gap-4 px-4 sm:px-6 lg:px-8">
                     <button @click="mobileMenuOpen = true"
                         class="rounded-xl border border-gray-800 bg-[#17191f] px-4 py-3 text-white lg:hidden">
-                        ☰
+                        &#9776;
                     </button>
 
 
