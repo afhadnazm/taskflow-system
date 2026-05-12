@@ -32,10 +32,11 @@
             <button
                 wire:click="save"
                 wire:loading.attr="disabled"
+                wire:target="save"
                 class="rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 font-semibold text-white shadow-lg shadow-blue-950/20 transition hover:from-blue-400 hover:to-cyan-400 disabled:opacity-50"
             >
-                <span wire:loading.remove>Create Project</span>
-                <span wire:loading>Saving...</span>
+                <span wire:loading.remove wire:target="save">Create Project</span>
+                <span wire:loading wire:target="save">Saving...</span>
             </button>
         </div>
     </div>
